@@ -6,13 +6,12 @@
 #include <zmq.hpp>
 
 int main(int argc, char *argv[]) {
-  // Command-line parameter:
-  // argv[1] = endpoint (default "tcp://localhost:7000")
+  std::string endpoint = (argc > 1) ? argv[1] : "tcp://localhost:7002";
+
   zmq::context_t context(1);
   zmq::socket_t sub(context, zmq::socket_type::sub);
-  sub.connect("tcp://localhost:7002");
+  sub.connect(endpoint);
 
-  // Subscribe to all messages.
   sub.setsockopt(ZMQ_SUBSCRIBE, "", 0);
 
   long msg_count = 0;
@@ -27,14 +26,12 @@ int main(int argc, char *argv[]) {
     sub.recv(message, zmq::recv_flags::none);
 
     if (message.size() < sizeof(double)) {
-      continue; // skip invalid messages
+      continue;
     }
 
-    // Extract the timestamp from the first 8 bytes.
     double sent_timestamp;
     std::memcpy(&sent_timestamp, message.data(), sizeof(double));
 
-    // Get current time as a double (seconds).
     auto now = std::chrono::system_clock::now();
     double now_timestamp =
         std::chrono::duration_cast<std::chrono::duration<double>>(
@@ -49,7 +46,6 @@ int main(int argc, char *argv[]) {
     total_latency += latency;
     msg_count++;
 
-    // Every 1000 messages, print statistics.
     if (msg_count % 10000 == 0) {
       auto current_time = std::chrono::steady_clock::now();
       double elapsed =

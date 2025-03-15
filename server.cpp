@@ -10,7 +10,6 @@
 #include <vector>
 #include <zmq.hpp>
 
-// Global registries and mutex for thread-safety.
 std::set<std::string> signalTopics;
 std::set<std::string> commandTopics;
 std::mutex registryMutex;
@@ -18,7 +17,7 @@ std::mutex registryMutex;
 void discoveryService() {
   zmq::context_t context(1);
   zmq::socket_t rep(context, zmq::socket_type::rep);
-  rep.bind("tcp://*:6004"); // Discovery service endpoint
+  rep.bind("tcp://*:6004");
 
   while (true) {
     zmq::message_t request;
@@ -71,22 +70,15 @@ void discoveryService() {
 }
 
 int main() {
-  // Start the discovery service in its own thread.
   std::thread discoveryThread(discoveryService);
-
-  // Create the main ZeroMQ context.
   zmq::context_t context(1);
 
-  // Set up bridging sockets.
-  // Data flow: Actors publish data -> broker forwards to clients.
   zmq::socket_t sub_actors(context, zmq::socket_type::sub);
   zmq::socket_t pub_clients(context, zmq::socket_type::pub);
-  sub_actors.bind("tcp://*:6000");  // Actors publish data here.
-  pub_clients.bind("tcp://*:6001"); // Clients subscribe to data here.
+  sub_actors.bind("tcp://*:6000");
+  pub_clients.bind("tcp://*:6001");
   sub_actors.setsockopt(ZMQ_SUBSCRIBE, "", 0);
 
-  // Command flow: Star clients publish commands -> broker forwards to star
-  // actors.
   zmq::socket_t sub_clients(context, zmq::socket_type::sub);
   zmq::socket_t pub_actors(context, zmq::socket_type::pub);
   sub_clients.bind("tcp://*:6002"); // Star clients publish commands here.

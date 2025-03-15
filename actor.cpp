@@ -8,13 +8,11 @@
 #include <vector>
 #include <zmq.hpp>
 
-// Helper function to split a string by a delimiter.
 std::vector<std::string> split(const std::string &s, char delimiter) {
   std::vector<std::string> tokens;
   std::istringstream tokenStream(s);
   std::string token;
   while (std::getline(tokenStream, token, delimiter)) {
-    // Trim any extra spaces.
     token.erase(std::remove_if(token.begin(), token.end(), ::isspace),
                 token.end());
     if (!token.empty()) {
@@ -25,13 +23,12 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
 }
 
 int main(int argc, char *argv[]) {
-  // Default values.
   std::string actor_id = "actorA";
   bool star_mode = false;
   std::string defaultSignals =
       "engine/temperature,engine/pressure,oil/level,brake/status";
   std::string signal_list = defaultSignals;
-  std::string cmd_sub_list = "cmd"; // default command subscription
+  std::string cmd_sub_list = "cmd";
 
   if (argc > 1) {
     actor_id = argv[1];
@@ -46,7 +43,6 @@ int main(int argc, char *argv[]) {
     cmd_sub_list = argv[4];
   }
 
-  // Parse the comma-separated lists.
   auto signals = split(signal_list, ',');
   std::vector<std::string> cmdSubscriptions;
   if (star_mode) {
@@ -55,7 +51,6 @@ int main(int argc, char *argv[]) {
 
   zmq::context_t context(1);
 
-  // Register each signal with the discovery service.
   {
     zmq::socket_t reg_socket(context, zmq::socket_type::req);
     reg_socket.connect("tcp://localhost:6004");
@@ -68,7 +63,7 @@ int main(int argc, char *argv[]) {
                 << std::string(static_cast<char *>(reply.data()), reply.size())
                 << std::endl;
     }
-    // If in star mode, also register each command topic.
+    // if in star mode, also register each command topic
     if (star_mode) {
       for (const auto &cmd : cmdSubscriptions) {
         std::string regMsg = "REGISTER COMMAND " + cmd;
@@ -83,13 +78,11 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Set up publisher for sending signals.
   zmq::socket_t pub_socket(context, zmq::socket_type::pub);
   pub_socket.connect("tcp://localhost:6000");
   std::cout << "[" << actor_id << "] Publishing signals to tcp://localhost:6000"
             << std::endl;
 
-  // In star mode, set up a subscriber for receiving commands.
   zmq::socket_t *sub_socket = nullptr;
   if (star_mode) {
     sub_socket = new zmq::socket_t(context, zmq::socket_type::sub);
@@ -105,7 +98,6 @@ int main(int argc, char *argv[]) {
 
   int counter = 0;
   while (true) {
-    // In star mode, poll for incoming commands.
     if (star_mode) {
       zmq::pollitem_t items[] = {
           {static_cast<void *>(*sub_socket), 0, ZMQ_POLLIN, 0}};
@@ -120,18 +112,14 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // For demo purposes, send one message per signal.
     for (const auto &sig : signals) {
       std::ostringstream oss;
-      // The message begins with the topic (e.g. "engine/temperature") followed
-      // by payload.
       oss << sig << " " << actor_id << " value #" << counter;
       std::string data = oss.str();
       zmq::message_t message(data.begin(), data.end());
       pub_socket.send(message, zmq::send_flags::none);
       std::cout << "[" << actor_id << "] Sent: " << data << std::endl;
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(1)); // slight delay between signals
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     ++counter;
   }

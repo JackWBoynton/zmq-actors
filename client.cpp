@@ -8,7 +8,6 @@
 #include <cstring>
 #include <algorithm>
 
-// Helper function to split a string by a delimiter.
 std::vector<std::string> split(const std::string &s, char delimiter) {
     std::vector<std::string> tokens;
     std::istringstream tokenStream(s);
@@ -25,7 +24,7 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
 int main(int argc, char* argv[]) {
     std::string client_id = "clientA";
     bool star_mode = false;
-    std::string sub_topics = "";  // If empty, subscribe to all.
+    std::string sub_topics = "";
     std::string pub_topic = "cmd";  // default command topic if in star mode
 
     if (argc > 1) {
@@ -43,7 +42,6 @@ int main(int argc, char* argv[]) {
 
     zmq::context_t context(1);
 
-    // Query discovery service for available signals.
     {
         zmq::socket_t query_socket(context, zmq::socket_type::req);
         query_socket.connect("tcp://localhost:6004");
@@ -55,7 +53,6 @@ int main(int argc, char* argv[]) {
         std::cout << "[" << client_id << "] Available SIGNALS: " << availableSignals << std::endl;
     }
 
-    // Set up subscriber for receiving signals.
     zmq::socket_t sub_socket(context, zmq::socket_type::sub);
     sub_socket.connect("tcp://localhost:6001");
     if (!sub_topics.empty()) {
@@ -65,12 +62,10 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "[" << client_id << "] Subscribing to topics: " << sub_topics << " at tcp://localhost:6001" << std::endl;
     } else {
-        // Subscribe to everything.
         sub_socket.setsockopt(ZMQ_SUBSCRIBE, "", 0);
         std::cout << "[" << client_id << "] Subscribing to ALL signals at tcp://localhost:6001" << std::endl;
     }
 
-    // In star mode, set up a publisher for sending commands.
     zmq::socket_t* pub_socket = nullptr;
     if (star_mode) {
         pub_socket = new zmq::socket_t(context, zmq::socket_type::pub);
@@ -81,7 +76,6 @@ int main(int argc, char* argv[]) {
 
     int cmd_counter = 0;
     while (true) {
-        // Poll for incoming signal messages.
         zmq::pollitem_t items[] = {
             { static_cast<void*>(sub_socket), 0, ZMQ_POLLIN, 0 }
         };
@@ -93,7 +87,6 @@ int main(int argc, char* argv[]) {
             std::cout << "[" << client_id << "] Received: " << data << std::endl;
         }
 
-        // In star mode, periodically send commands.
         if (star_mode && pub_socket) {
             static auto last_command_time = std::chrono::steady_clock::now();
             auto now = std::chrono::steady_clock::now();
@@ -101,7 +94,6 @@ int main(int argc, char* argv[]) {
             if (elapsed.count() >= 20) {
                 last_command_time = now;
                 std::ostringstream oss;
-                // The command message begins with the command topic.
                 oss << pub_topic << " " << client_id << " command #" << cmd_counter++;
                 std::string cmd = oss.str();
                 zmq::message_t cmd_msg(cmd.begin(), cmd.end());
